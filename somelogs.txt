@@ -1,0 +1,26 @@
+<function monte_carlo at 0x000002807B27B820>
+100%|██████████| 1000/1000 [10:42<00:00,  1.56it/s]
+<function pure_random at 0x000002807B27BA60>
+100%|██████████| 1000/1000 [09:53<00:00,  1.69it/s]
+<function orth_sampling at 0x000002807B27B940>
+100%|██████████| 1000/1000 [10:31<00:00,  1.58it/s]
+<function lhs at 0x000002807B27B9D0>
+100%|██████████| 1000/1000 [13:35<00:00,  1.23it/s]
+<function imp_monte_carlo at 0x000002807B27B8B0>
+100%|██████████| 1000/1000 [11:44<00:00,  1.42it/s]
+<function monte_carlo at 0x000002807B27B820>
+100%|██████████| 100/100 [02:15<00:00,  1.36s/it]
+<function pure_random at 0x000002807B27BA60>
+100%|██████████| 100/100 [02:12<00:00,  1.33s/it]
+<function orth_sampling at 0x000002807B27B940>
+100%|██████████| 100/100 [02:11<00:00,  1.31s/it]
+<function lhs at 0x000002807B27B9D0>
+100%|██████████| 100/100 [02:20<00:00,  1.40s/it]
+<function imp_monte_carlo at 0x000002807B27B8B0>
+100%|██████████| 100/100 [01:58<00:00,  1.19s/it]
+
+
+          monte_carlo  pure_random  ...  imp_monte_carlo  stat_sample_size
+avg_area     1.509702     1.508335  ...         1.511052               100
+var_area     0.000662     0.000597  ...         0.000507               100
+
