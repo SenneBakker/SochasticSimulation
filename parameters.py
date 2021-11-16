@@ -10,5 +10,4 @@ IM_END = 1.12
 AREA_SQUARE = (abs(RE_START) + abs(RE_END)) * (abs(IM_START) + abs(IM_END))
 
 NO_SAMPLES = 10000
-MAX_ITER = 100
-NO_SUBSPACES = 100 # 10 by 10 subspaces
+MAX_ITER = 1000
