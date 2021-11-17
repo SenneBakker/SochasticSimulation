@@ -205,7 +205,7 @@ def cpu_spread_taking_maxiter(process_range, function):
     avg_area = st.mean(areas)
     var_area = st.variance(areas)
 
-    return avg_area, var_area
+    return avg_area, var_area, areas
 
 
 def balanced_sample_size(sizes):
@@ -238,9 +238,21 @@ def plot_area_convergence(result_dict):
     return
 
 
-def perform_stat_analysis(stats):
-    table = pd.DataFrame.from_dict(stats)
-    print(table)
+def perform_stat_analysis(stats_dict):
+    # https://www.reneshbedre.com/blog/anova.html
+
+    levenes_stat, pvalue2 = stats.levene(stats_dict["monte_carlo"]["areas"],
+                                    stats_dict["pure_random"]["areas"],
+                                    stats_dict["orth_sampling"]["areas"],
+                                    stats_dict["lhs"]["areas"],
+                                    stats_dict["imp_monte_carlo"]["areas"])
+    print('we do not assume that the populations have equal variance, therefore levene instead of anova')
+    print('levene digit: %s, pvalue: %s' %(levenes_stat, pvalue2))
+    print('pvalue smaller than 0.05, therefore the variances differ significantly\n')
+    df = pd.DataFrame.from_dict(stats_dict)
+    df.drop(df.tail(1).index, inplace=True)# Skip last row with all areas
+    df.to_excel("output.xlsx")
+    print(df)
     return
 
 
@@ -255,9 +267,9 @@ def plot_sample_sizes(ss, ssz):
 
 
 # select here what to run of the script
-run_ajs_convergence = True
-run_stats_max_iter = True
-run_ajs_conv_plotting = True
+run_ajs_convergence = False
+run_stats_max_iter = False
+run_ajs_conv_plotting = False
 run_statistical_analysis = True # to be completed
 
 run_sample_sizes = False
@@ -304,13 +316,14 @@ if __name__ == '__main__':
         for method in methods:
             print(str(method))
             pool = multiprocessing.Pool(os.cpu_count())
-            avg_area, var_area = pool.apply(cpu_spread_taking_maxiter, (iterations, method,))
+            avg_area, var_area, areas = pool.apply(cpu_spread_taking_maxiter, (iterations, method,))
             label = str(method.__name__)
             stats_dict[label] = {"avg_area": avg_area,
-                              "var_area": var_area}
+                              "var_area": var_area,
+                                 "areas": areas}
         stats_dict["stat_sample_size"] = stat_sample_size
         file_to_write = open("stats.pickle", "wb")
-        pickle.dump(stats, file_to_write)
+        pickle.dump(stats_dict, file_to_write)
         file_to_write.close()
         table = pd.DataFrame.from_dict(stats_dict)
         print(table)
