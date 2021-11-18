@@ -190,7 +190,7 @@ def cpu_spread(process_range, function):
     for j in tqdm(process_range): # van 1 tot 200 max iteraties
         area_js = function(j)
         areas_js.append(area_js)
-        area_diff = area_js - area_is
+        area_diff = abs(area_js - area_is)
         areas_diff.append(area_diff)
     return areas_js, areas_diff
 
@@ -204,8 +204,10 @@ def cpu_spread_taking_maxiter(process_range, function):
 
     avg_area = st.mean(areas)
     var_area = st.variance(areas)
+    ci_upper = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.sem(areas))[1]
+    ci_down = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.sem(areas))[0]
 
-    return avg_area, var_area
+    return avg_area, var_area, areas, ci_upper, ci_down
 
 
 def balanced_sample_size(sizes):
@@ -235,12 +237,42 @@ def plot_area_convergence(result_dict):
     plt.legend(fontsize=10)
     plt.savefig('A_diff_%s_%s.jpg' % (par.NO_SAMPLES, par.MAX_ITER))
     plt.clf()
+    for i in results:
+        plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i)
+    plt.xlim(600, 1000)
+    plt.ylim(-0.1, 0.1)
+    plt.xlabel('Max iterations Mandelbrot', fontsize=12)
+    plt.ylabel('A_js - A_is', fontsize=12)
+    plt.savefig('A_diff_%s_%s_last200.jpg' % (par.NO_SAMPLES, par.MAX_ITER))
+    plt.clf()
     return
 
 
-def perform_stat_analysis(stats):
-    table = pd.DataFrame.from_dict(stats)
-    print(table)
+def perform_stat_analysis(stats_dict):
+    # https://www.reneshbedre.com/blog/anova.html
+    levenes_stat, pvalue2 = stats.levene(stats_dict["monte_carlo"]["areas"],
+                                    stats_dict["pure_random"]["areas"],
+                                    stats_dict["orth_sampling"]["areas"],
+                                    stats_dict["lhs"]["areas"],
+                                    stats_dict["imp_monte_carlo"]["areas"])
+    print('we do not assume that the populations have equal variance, therefore levene instead of anova')
+    print('levene digit: %s, pvalue: %s' %(levenes_stat, pvalue2))
+    print('pvalue smaller than 0.05, therefore the variances differ significantly\n')
+
+    methods = ["monte_carlo", "pure_random", "orth_sampling", "lhs", "imp_monte_carlo"]
+    # get all possible pairs for F-testing
+    all_pairs = [(methods[i], methods[j]) for i in range(len(methods)) for j in range(i + 1, len(methods))]
+    for pair in all_pairs:
+        F = np.var(stats_dict["%s"%pair[0]]["areas"], ddof=1) / np.var(stats_dict["%s"%pair[1]]["areas"], ddof=1)
+        dfn = len(stats_dict["%s"%pair[0]]["areas"]) - 1  # define degrees of freedom numerator
+        dfd = len(stats_dict["%s"%pair[1]]["areas"]) - 1  # define degrees of freedom denominator
+        p_value = stats.f.cdf(F, dfn, dfd)
+        print('pvalue for %s and %s is %s' %(pair[0], pair[1], p_value))
+
+    df = pd.DataFrame.from_dict(stats_dict)
+    df.drop(df.tail(1).index, inplace=True)# Skip last row with all areas
+    df.to_excel("output.xlsx")
+    print(df)
     return
 
 
@@ -255,8 +287,8 @@ def plot_sample_sizes(ss, ssz):
 
 
 # select here what to run of the script
-run_ajs_convergence = True
-run_stats_max_iter = True
+run_ajs_convergence = False
+run_stats_max_iter = False
 run_ajs_conv_plotting = True
 run_statistical_analysis = True # to be completed
 
@@ -298,19 +330,22 @@ if __name__ == '__main__':
         file_to_write.close()
 
     if run_stats_max_iter:
-        stat_sample_size = 100 # 100 sample runs
+        stat_sample_size = par.STAT_SAMPLE_SIZE # 100 sample runs
         methods = [monte_carlo, pure_random, orth_sampling, lhs, imp_monte_carlo]
         iterations = list(range(1, stat_sample_size + 1, 1))
         for method in methods:
             print(str(method))
             pool = multiprocessing.Pool(os.cpu_count())
-            avg_area, var_area = pool.apply(cpu_spread_taking_maxiter, (iterations, method,))
+            avg_area, var_area, areas, ci_up, ci_down = pool.apply(cpu_spread_taking_maxiter, (iterations, method,))
             label = str(method.__name__)
             stats_dict[label] = {"avg_area": avg_area,
-                              "var_area": var_area}
+                              "var_area": var_area,
+                                 "ci_upper": ci_up,
+                                 "ci_down": ci_down,
+                                 "areas": areas}
         stats_dict["stat_sample_size"] = stat_sample_size
         file_to_write = open("stats.pickle", "wb")
-        pickle.dump(stats, file_to_write)
+        pickle.dump(stats_dict, file_to_write)
         file_to_write.close()
         table = pd.DataFrame.from_dict(stats_dict)
         print(table)
@@ -324,7 +359,6 @@ if __name__ == '__main__':
         infile = open("stats.pickle", 'rb')
         new_dict_stats = pickle.load(infile)
         perform_stat_analysis(new_dict_stats)
-
 
     if run_sample_sizes:
         pool = multiprocessing.Pool(os.cpu_count())

@@ -9,5 +9,9 @@ IM_START = -1.12  # y as
 IM_END = 1.12
 AREA_SQUARE = (abs(RE_START) + abs(RE_END)) * (abs(IM_START) + abs(IM_END))
 
-NO_SAMPLES = 10000
+NO_SAMPLES = 10000   # for orthogonal sampling make sure the root of this value is an integer as well
 MAX_ITER = 1000
+
+STAT_SAMPLE_SIZE = 1000
+
+alpha = 0.95 # confidence interval
