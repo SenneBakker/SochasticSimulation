@@ -1,26 +1,24 @@
-<function monte_carlo at 0x000002807B27B820>
-100%|██████████| 1000/1000 [10:42<00:00,  1.56it/s]
-<function pure_random at 0x000002807B27BA60>
-100%|██████████| 1000/1000 [09:53<00:00,  1.69it/s]
-<function orth_sampling at 0x000002807B27B940>
-100%|██████████| 1000/1000 [10:31<00:00,  1.58it/s]
-<function lhs at 0x000002807B27B9D0>
-100%|██████████| 1000/1000 [13:35<00:00,  1.23it/s]
-<function imp_monte_carlo at 0x000002807B27B8B0>
-100%|██████████| 1000/1000 [11:44<00:00,  1.42it/s]
-<function monte_carlo at 0x000002807B27B820>
-100%|██████████| 100/100 [02:15<00:00,  1.36s/it]
-<function pure_random at 0x000002807B27BA60>
-100%|██████████| 100/100 [02:12<00:00,  1.33s/it]
-<function orth_sampling at 0x000002807B27B940>
-100%|██████████| 100/100 [02:11<00:00,  1.31s/it]
-<function lhs at 0x000002807B27B9D0>
-100%|██████████| 100/100 [02:20<00:00,  1.40s/it]
-<function imp_monte_carlo at 0x000002807B27B8B0>
-100%|██████████| 100/100 [01:58<00:00,  1.19s/it]
+C:\Users\wjrti\anaconda3\python.exe C:/Users/wjrti/PycharmProjects/StochasticSimulation/stoch_sim_ass1.py
+we do not assume that the populations have equal variance, therefore levene instead of anova
+levene digit: 394.43441562472543, pvalue: 1.120803869644206e-295
+pvalue smaller than 0.05, therefore the variances differ significantly
 
+pvalue for monte_carlo and pure_random is 0.5000000000001952
+pvalue for monte_carlo and orth_sampling is 0.9999999999999999
+pvalue for monte_carlo and lhs is 0.9999999999999999
+pvalue for monte_carlo and imp_monte_carlo is 9.151592431331414e-10
+pvalue for pure_random and orth_sampling is 0.9999999999999999
+pvalue for pure_random and lhs is 0.9999999999999999
+pvalue for pure_random and imp_monte_carlo is 9.151592431331414e-10
+pvalue for orth_sampling and lhs is 0.0
+pvalue for orth_sampling and imp_monte_carlo is 0.0
+pvalue for lhs and imp_monte_carlo is 6.13688731680177e-88
+          monte_carlo  pure_random  ... imp_monte_carlo stat_sample_size
+avg_area      1.50923      1.50923  ...         1.51055             1000
+var_area  0.000623114  0.000623114  ...     0.000912701             1000
+ci_upper      1.55821      1.55821  ...         1.56984             1000
+ci_down       1.46024      1.46024  ...         1.45127             1000
 
-          monte_carlo  pure_random  ...  imp_monte_carlo  stat_sample_size
-avg_area     1.509702     1.508335  ...         1.511052               100
-var_area     0.000662     0.000597  ...         0.000507               100
+[4 rows x 6 columns]
 
+Process finished with exit code 0

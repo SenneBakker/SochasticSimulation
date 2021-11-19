@@ -6,6 +6,8 @@ import math
 import pickle
 import statistics as st
 from scipy import stats
+from scipy.stats import distributions as dist
+from numpy.random import choice
 import os
 import matplotlib.pyplot as plt
 import multiprocessing   # used to improve time efficiency
@@ -56,12 +58,35 @@ def monte_carlo(max_iter):
 def imp_monte_carlo(max_iter):
     sample_area_count = 0
 
-    for idx, item in enumerate(range(par.NO_SAMPLES)):
-        x = np.random.uniform(low=0, high=1)
-        y = np.random.uniform(low=0, high=1)
-        if idx % 2: # every even number we pick the antithetic variete of x or y
-            x = 1 - x
-            y = 1 - y
+    # Create alternative uniform dist A
+    mu_x, std_x = stats.uniform.fit(np.random.uniform(low=0, high=1, size=par.NO_SAMPLES))
+    mu_y, std_y = stats.uniform.fit(np.random.uniform(low=0, high=1, size=par.NO_SAMPLES))
+
+    # Create random samples from uniform dist B
+    x_samples = np.random.uniform(low=0, high=1, size=par.NO_SAMPLES)
+    y_samples = np.random.uniform(low=0, high=1, size=par.NO_SAMPLES)
+
+    weights = 1/par.NO_SAMPLES
+
+    # Evaluate samples from dist B, on dist A
+    evaluate_x = stats.uniform.pdf(x_samples, mu_x, std_x)
+    evaluate_y = stats.uniform.pdf(y_samples, mu_y, std_y)
+
+    # Determine importance
+    importance_x = evaluate_x / weights
+    importance_x_dist = importance_x / sum(importance_x)
+    importance_y = evaluate_y / weights
+    importance_y_dist = importance_y / sum(importance_y)
+
+    # Draw new samples from importance sampled dist
+    new_x = choice(x_samples, par.NO_SAMPLES,
+              p=importance_x_dist)
+    new_y = choice(y_samples, par.NO_SAMPLES,
+                   p=importance_y_dist)
+
+    for value_x, value_y in zip(new_x,new_y):
+        x = value_x
+        y = value_y
         # Convert coordinates to complex number and compute the mandelbrot iterations
         c = complex(par.RE_START + x * (par.RE_END - par.RE_START),
                     par.IM_START + y * (par.IM_END - par.IM_START))
@@ -204,8 +229,8 @@ def cpu_spread_taking_maxiter(process_range, function):
 
     avg_area = st.mean(areas)
     var_area = st.variance(areas)
-    ci_upper = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.sem(areas))[1]
-    ci_down = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.sem(areas))[0]
+    ci_upper = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.stdev(areas))[1]
+    ci_down = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.stdev(areas))[0]
 
     return avg_area, var_area, areas, ci_upper, ci_down
 
@@ -240,7 +265,7 @@ def plot_area_convergence(result_dict):
     for i in results:
         plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i)
     plt.xlim(600, 1000)
-    plt.ylim(-0.1, 0.1)
+    plt.ylim(-0.01, 0.1)
     plt.xlabel('Max iterations Mandelbrot', fontsize=12)
     plt.ylabel('A_js - A_is', fontsize=12)
     plt.savefig('A_diff_%s_%s_last200.jpg' % (par.NO_SAMPLES, par.MAX_ITER))
