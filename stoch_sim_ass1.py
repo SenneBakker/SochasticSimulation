@@ -1,15 +1,20 @@
 import random
 import pandas as pd
-from tqdm import tqdm   # used for time management
 import numpy as np
 import math
 import pickle
+import seaborn as sns
 import statistics as st
-from scipy import stats
 import os
 import matplotlib.pyplot as plt
 import multiprocessing   # used to improve time efficiency
 import parameters as par
+
+from tqdm import tqdm   # used for time management
+from scipy import stats
+from scipy.stats import distributions as dist
+from numpy.random import choice
+
 fig = plt.figure(figsize=(6,4), dpi=300)
 
 # https://www.codingame.com/playgrounds/2358/how-to-plot-the-mandelbrot-set/mandelbrot-set
@@ -27,41 +32,39 @@ def mandelbrot(c, max_iter):
         n += 1
     return n
 
-
-def monte_carlo(max_iter):
-    sample_area_count = 0
-    for i in range(par.NO_SAMPLES):
-
-        # Draw random numbers from uniform distribution
-        x = np.random.uniform(low=0, high=1)
-        y = np.random.uniform(low=0, high=1)
-
-        # Convert coordinates to complex number and compute the mandelbrot iterations
-        c = complex(par.RE_START + x * (par.RE_END - par.RE_START),
-                    par.IM_START + y * (par.IM_END - par.IM_START))
-        # Compute the number of iterations
-        m = mandelbrot(c, max_iter)
-        # The color depends on the number of iterations
-        color = 255 - int(m * 255 / max_iter)
-        if color == 0:
-            sample_area_count += 1
-
-    # Calculate average of the samples and determine area approx
-    within_mb_set = sample_area_count / par.NO_SAMPLES
-    area_approx = within_mb_set * par.AREA_SQUARE
-    return area_approx
-
-
-# improved monte carlo
+# improved pure random sampling
 def imp_monte_carlo(max_iter):
     sample_area_count = 0
 
-    for idx, item in enumerate(range(par.NO_SAMPLES)):
-        x = np.random.uniform(low=0, high=1)
-        y = np.random.uniform(low=0, high=1)
-        if idx % 2: # every even number we pick the antithetic variete of x or y
-            x = 1 - x
-            y = 1 - y
+    # Create alternative target uniform dist A
+    mu_x, std_x = stats.uniform.fit(np.random.uniform(low=0, high=1, size=par.NO_SAMPLES))
+    mu_y, std_y = stats.uniform.fit(np.random.uniform(low=0, high=1, size=par.NO_SAMPLES))
+
+    # Create random samples from uniform dist B
+    x_samples = np.random.uniform(low=0, high=1, size=par.NO_SAMPLES)
+    y_samples = np.random.uniform(low=0, high=1, size=par.NO_SAMPLES)
+
+    weights = 1/par.NO_SAMPLES
+
+    # Evaluate samples from dist B, on dist A
+    evaluate_x = stats.uniform.pdf(x_samples, mu_x, std_x)
+    evaluate_y = stats.uniform.pdf(y_samples, mu_y, std_y)
+
+    # Determine importance
+    importance_x = evaluate_x / weights
+    importance_x_dist = importance_x / sum(importance_x)
+    importance_y = evaluate_y / weights
+    importance_y_dist = importance_y / sum(importance_y)
+
+    # Draw new samples from importance sampled dist
+    new_x = choice(x_samples, par.NO_SAMPLES,
+              p=importance_x_dist)
+    new_y = choice(y_samples, par.NO_SAMPLES,
+                   p=importance_y_dist)
+
+    for value_x, value_y in zip(new_x,new_y):
+        x = value_x
+        y = value_y
         # Convert coordinates to complex number and compute the mandelbrot iterations
         c = complex(par.RE_START + x * (par.RE_END - par.RE_START),
                     par.IM_START + y * (par.IM_END - par.IM_START))
@@ -107,13 +110,13 @@ def orth_sampling(max_iter):
             color = 255 - int(m * 255 / max_iter)
             if color == 0:
                 sample_area_count += 1
-                #plt.plot(x, y, 'ro', color='green', ms=72. / fig.dpi)
-            #else:
-                #plt.plot(x, y, 'ro', color='red', ms=72. / fig.dpi)
+                plt.plot(x, y, 'ro', color='green')
+            else:
+                plt.plot(x, y, 'ro', color='red')
             #plt.axvline(x=(par.RE_START + (scale_x * (xlist[i][j]))), color='black')
             #plt.axhline(y= (par.IM_START + (scale_y * (ylist[j][i]))), color='black')
 
-    #plt.show()
+    plt.savefig('exampleplotorthsamp.jpg')
     # Calculate average of the samples and determine area approx
     within_mb_set = sample_area_count / par.NO_SAMPLES
     area_approx = within_mb_set * par.AREA_SQUARE
@@ -203,72 +206,83 @@ def cpu_spread_taking_maxiter(process_range, function):
         areas.append(area)
 
     avg_area = st.mean(areas)
-    var_area = st.variance(areas)
-    ci_upper = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.sem(areas))[1]
-    ci_down = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=st.sem(areas))[0]
+    std_area = np.std(areas)
+    ci_upper = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=np.std(areas))[1]
+    ci_down = stats.t.interval(alpha=par.alpha, df=len(areas)-1, loc=avg_area, scale=np.std(areas))[0]
 
-    return avg_area, var_area, areas, ci_upper, ci_down
+    return avg_area, std_area, areas, ci_upper, ci_down
 
 
 def balanced_sample_size(sizes):
     areas_js = []
     for j in tqdm(sizes): # van 1 tot 200 max samples
         par.NO_SAMPLES = j
-        area_js = monte_carlo()
+        area_js = pure_random(par.MAX_ITER)
         areas_js.append(area_js)
     return areas_js
 
 
 def plot_area_convergence(result_dict):
-    results = ["monte_carlo","pure_random","orth_sampling","lhs", "imp_monte_carlo"]
+    results = ["pure_random","orth_sampling","lhs", "imp_monte_carlo"]
+    colors = ['b', 'g', 'r', 'c', 'm']
     # plot total area
-    for i in results:
-        plt.plot(result_dict["iterations"], result_dict[i]["area_js"], label="%s"%i)
+    for idx, i in enumerate(results):
+        plt.plot(result_dict["iterations"], result_dict[i]["area_js"], label="%s"%i, color=colors[idx])
     plt.xlabel('Max iterations Mandelbrot', fontsize=12)
     plt.ylabel('Area approximation', fontsize=12)
     plt.legend()
     plt.savefig('A_js_%s_%s.jpg'%(par.NO_SAMPLES, par.MAX_ITER))
     plt.clf()
     # plot diff area
-    for i in results:
-        plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i)
+    for idx, i in enumerate(results):
+        plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i, color=colors[idx])
     plt.xlabel('Max iterations Mandelbrot', fontsize=12)
     plt.ylabel('A_js - A_is', fontsize=12)
     plt.legend(fontsize=10)
     plt.savefig('A_diff_%s_%s.jpg' % (par.NO_SAMPLES, par.MAX_ITER))
     plt.clf()
-    for i in results:
-        plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i)
+    for idx, i in enumerate(results):
+        plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i, color=colors[idx])
     plt.xlim(600, 1000)
-    plt.ylim(-0.1, 0.1)
+    plt.ylim(-0.01, 0.1)
     plt.xlabel('Max iterations Mandelbrot', fontsize=12)
     plt.ylabel('A_js - A_is', fontsize=12)
     plt.savefig('A_diff_%s_%s_last200.jpg' % (par.NO_SAMPLES, par.MAX_ITER))
     plt.clf()
+    for idx, i in enumerate(results):
+        plt.plot(result_dict["iterations"], result_dict[i]["area_diff"], label="%s"%i, color=colors[idx])
+    plt.xlim(0, 20)
+    plt.xlabel('Max iterations Mandelbrot', fontsize=12)
+    plt.ylabel('A_js - A_is', fontsize=12)
+    plt.savefig('A_diff_%s_%s_first20.jpg' % (par.NO_SAMPLES, par.MAX_ITER))
+    plt.clf()
+
     return
 
 
 def perform_stat_analysis(stats_dict):
-    # https://www.reneshbedre.com/blog/anova.html
-    levenes_stat, pvalue2 = stats.levene(stats_dict["monte_carlo"]["areas"],
-                                    stats_dict["pure_random"]["areas"],
-                                    stats_dict["orth_sampling"]["areas"],
-                                    stats_dict["lhs"]["areas"],
-                                    stats_dict["imp_monte_carlo"]["areas"])
-    print('we do not assume that the populations have equal variance, therefore levene instead of anova')
-    print('levene digit: %s, pvalue: %s' %(levenes_stat, pvalue2))
-    print('pvalue smaller than 0.05, therefore the variances differ significantly\n')
+    # plot the distributions - based on this make some assumptions for testing
+    sns.distplot(stats_dict["pure_random"]["areas"], label='pure_random')
+    sns.distplot(stats_dict["orth_sampling"]["areas"], label='orth_sampling')
+    sns.distplot(stats_dict["lhs"]["areas"], label='lhs')
+    sns.distplot(stats_dict["imp_monte_carlo"]["areas"], label='imp_monte_carlo')
+    plt.xlabel('Mandelbrot Area')
+    plt.ylabel('No. Samples')
+    plt.legend()
+    plt.savefig('distplot.jpg')
 
-    methods = ["monte_carlo", "pure_random", "orth_sampling", "lhs", "imp_monte_carlo"]
+
+    methods = ["pure_random", "orth_sampling", "lhs", "imp_monte_carlo"]
+
     # get all possible pairs for F-testing
     all_pairs = [(methods[i], methods[j]) for i in range(len(methods)) for j in range(i + 1, len(methods))]
-    for pair in all_pairs:
-        F = np.var(stats_dict["%s"%pair[0]]["areas"], ddof=1) / np.var(stats_dict["%s"%pair[1]]["areas"], ddof=1)
-        dfn = len(stats_dict["%s"%pair[0]]["areas"]) - 1  # define degrees of freedom numerator
-        dfd = len(stats_dict["%s"%pair[1]]["areas"]) - 1  # define degrees of freedom denominator
-        p_value = stats.f.cdf(F, dfn, dfd)
-        print('pvalue for %s and %s is %s' %(pair[0], pair[1], p_value))
 
+    # pair wise t tests
+    for pair in all_pairs:
+        t_test = stats.ttest_ind(stats_dict["%s"%pair[0]]["areas"], stats_dict["%s"%pair[1]]["areas"])
+        print('t test for %s and %s is %s' %(pair[0], pair[1], t_test))
+
+    # Get results table
     df = pd.DataFrame.from_dict(stats_dict)
     df.drop(df.tail(1).index, inplace=True)# Skip last row with all areas
     df.to_excel("output.xlsx")
@@ -289,21 +303,21 @@ def plot_sample_sizes(ss, ssz):
 # select here what to run of the script
 run_ajs_convergence = False
 run_stats_max_iter = False
-run_ajs_conv_plotting = True
-run_statistical_analysis = True # to be completed
+run_ajs_conv_plotting = False
+run_statistical_analysis = False # to be completed
 
 run_sample_sizes = False
 
+print(orth_sampling(par.MAX_ITER))
+
 results = {
     "iterations" : [],
-    "monte_carlo": [],
     "pure_random": [],
     "orth_sampling": [],
     "lhs" : [],
     "imp_monte_carlo": []}
 
-stats_dict ={"monte_carlo": [],
-    "pure_random": [],
+stats_dict ={"pure_random": [],
     "orth_sampling": [],
     "lhs" : [],
     "imp_monte_carlo": [],
@@ -313,7 +327,7 @@ stats_dict ={"monte_carlo": [],
 
 if __name__ == '__main__':
     if run_ajs_convergence:
-        methods = [monte_carlo, pure_random, orth_sampling, lhs, imp_monte_carlo]
+        methods = [pure_random, orth_sampling, lhs, imp_monte_carlo]
         iterations = list(range(1, par.MAX_ITER + 1, 1))
         for method in methods:
             print(str(method))
@@ -331,15 +345,15 @@ if __name__ == '__main__':
 
     if run_stats_max_iter:
         stat_sample_size = par.STAT_SAMPLE_SIZE # 100 sample runs
-        methods = [monte_carlo, pure_random, orth_sampling, lhs, imp_monte_carlo]
+        methods = [pure_random, orth_sampling, lhs, imp_monte_carlo]
         iterations = list(range(1, stat_sample_size + 1, 1))
         for method in methods:
             print(str(method))
             pool = multiprocessing.Pool(os.cpu_count())
-            avg_area, var_area, areas, ci_up, ci_down = pool.apply(cpu_spread_taking_maxiter, (iterations, method,))
+            avg_area, std_area, areas, ci_up, ci_down = pool.apply(cpu_spread_taking_maxiter, (iterations, method,))
             label = str(method.__name__)
             stats_dict[label] = {"avg_area": avg_area,
-                              "var_area": var_area,
+                              "std_area": std_area,
                                  "ci_upper": ci_up,
                                  "ci_down": ci_down,
                                  "areas": areas}
