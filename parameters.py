@@ -15,3 +15,7 @@ MAX_ITER = 1000
 STAT_SAMPLE_SIZE = 1000
 
 alpha = 0.95 # confidence interval
+
+# Beta distribution target parameters, beta fixed at 1.0
+a = 2
+a2 = 2.4
