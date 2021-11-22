@@ -11,10 +11,10 @@ AREA_SQUARE = (abs(RE_START) + abs(RE_END)) * (abs(IM_START) + abs(IM_END))
 
 NO_SAMPLES = 10000   # for orthogonal sampling make sure the root of this value is an integer as well
 MAX_ITER = 1000
-
 STAT_SAMPLE_SIZE = 1000
 
-alpha = 0.95 # confidence interval
+# confidence interval
+alpha = 0.95
 
 # Beta distribution target parameters, beta fixed at 1.0
 a = 2
